@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { equipmentStore, uid, type Equipment } from "@/lib/db";
 
-const CATEGORIES = ["weights", "bodyweight", "cardio", "misc"];
-const EMOJIS = ["🏋️", "🔔", "🧗", "🛏️", "🎗️", "🧘", "🪢", "🚴", "🤸", "🥊", "⚙️", "📦"];
+const CATEGORIES = ["weights", "bodyweight", "misc"];
+const EMOJIS = ["🏋️", "🔔", "🪑", "🎗️", "🧘", "🪢", "🚴", "🤸", "🥊", "⚙️", "📦", "🧱"];
 
 export default function EquipmentPage() {
   const [items, setItems] = useState<Equipment[]>([]);
-  const [adding, setAdding] = useState(false);
+  const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", emoji: "🏋️", category: "weights", weightLb: "", note: "" });
 
@@ -33,14 +33,14 @@ export default function EquipmentPage() {
     };
     await equipmentStore.put(e);
     await refresh();
-    setAdding(false);
+    setOpen(false);
     setEditing(null);
     setForm({ name: "", emoji: "🏋️", category: "weights", weightLb: "", note: "" });
   }
 
   function startEdit(e: Equipment) {
     setEditing(e.id);
-    setAdding(true);
+    setOpen(true);
     setForm({ name: e.name, emoji: e.emoji, category: e.category, weightLb: e.weightLb?.toString() ?? "", note: e.note });
   }
 
@@ -48,66 +48,56 @@ export default function EquipmentPage() {
     if (!confirm("Remove this from your gear list?")) return;
     await equipmentStore.del(id);
     await refresh();
-    setAdding(false);
+    setOpen(false);
     setEditing(null);
   }
 
   return (
     <div>
       <h1>Gear 🏋️</h1>
-      <p className="sub">What you have at home — sets you log can pick from this.</p>
+      <p className="sub">Your home gym. Tap a tile to edit — sets you log can use these.</p>
 
       <div className="eq-grid">
         {items.map((e) => (
           <div className="eq-tile" key={e.id} onClick={() => startEdit(e)}>
             <div className="em">{e.emoji}</div>
             <b>{e.name}</b>
-            <span>
-              {e.weightLb != null ? `up to ${e.weightLb} lb` : CATEGORIES.includes(e.category) ? e.category : ""}
-            </span>
+            <span>{e.weightLb != null ? `${e.weightLb} lb${e.note ? ` · ${e.note}` : ""}` : e.note || e.category}</span>
           </div>
         ))}
       </div>
 
-      {items.length === 0 && <div className="empty">No gear yet — add what you own below.</div>}
+      {items.length === 0 && <div className="empty">No gear yet — add what you own.</div>}
 
       <button
         className="btn btn-primary btn-full mt12"
         onClick={() => {
-          setAdding(!adding);
+          setOpen(!open);
           setEditing(null);
           setForm({ name: "", emoji: "🏋️", category: "weights", weightLb: "", note: "" });
         }}
       >
-        {adding ? "Close" : "+ Add equipment"}
+        {open ? "Close" : "+ Add equipment"}
       </button>
 
-      {adding && (
+      {open && (
         <div className="card mt12">
           <input
             className="input"
-            placeholder="Name (e.g. Adjustable dumbbells)"
+            placeholder="Name (e.g. Kettlebell)"
             value={form.name}
             onChange={(ev) => setForm({ ...form, name: ev.target.value })}
           />
           <div className="chips mt8">
             {EMOJIS.map((em) => (
-              <button
-                key={em}
-                className={`chip ${form.emoji === em ? "on" : ""}`}
-                onClick={() => setForm({ ...form, emoji: em })}
-              >
+              <button key={em} className={`chip ${form.emoji === em ? "on" : ""}`} onClick={() => setForm({ ...form, emoji: em })}>
                 {em}
               </button>
             ))}
           </div>
           <div className="chips mt8">
             {CATEGORIES.map((c) => (
-              <button
-                key={c}
-                className={`chip ${form.category === c ? "on" : ""}`}
-                onClick={() => setForm({ ...form, category: c })}
-              >
+              <button key={c} className={`chip ${form.category === c ? "on" : ""}`} onClick={() => setForm({ ...form, category: c })}>
                 {c}
               </button>
             ))}
@@ -116,7 +106,7 @@ export default function EquipmentPage() {
             className="input mt8"
             type="number"
             inputMode="decimal"
-            placeholder="Max weight (lb) — optional"
+            placeholder="Weight (lb) — optional"
             value={form.weightLb}
             onChange={(ev) => setForm({ ...form, weightLb: ev.target.value })}
           />

@@ -1,20 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { workoutStore, prFor, volume, exportAll, importAll, type Workout } from "@/lib/db";
-
-function monthMatrix(year: number, month: number, active: Set<string>) {
-  const first = new Date(year, month, 1);
-  const startDow = first.getDay();
-  const days = new Date(year, month + 1, 0).getDate();
-  const cells: (string | null)[] = [];
-  for (let i = 0; i < startDow; i++) cells.push(null);
-  for (let d = 1; d <= days; d++) {
-    const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    cells.push(key);
-  }
-  return { cells, active };
-}
+import { workoutStore, prFor, volume, exportAll, importAll, todayKey, type Workout } from "@/lib/db";
 
 export default function HistoryPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
@@ -36,8 +23,18 @@ export default function HistoryPage() {
     return m;
   }, [workouts]);
 
-  const { cells } = monthMatrix(cursor.y, cursor.m, activeDays);
-  const monthLabel = new Date(cursor.y, cursor.m, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const first = new Date(cursor.y, cursor.m, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(cursor.y, cursor.m + 1, 0).getDate();
+  const cells: (string | null)[] = [
+    ...Array.from({ length: startDow }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => {
+      const key = `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`;
+      return key;
+    }),
+  ];
+  const monthLabel = first.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const today = todayKey();
 
   const prs = useMemo(() => {
     const best = new Map<string, { weight: number; date: string }>();
@@ -52,21 +49,21 @@ export default function HistoryPage() {
   }, [workouts]);
 
   const totalVolume = workouts.reduce((a, w) => a + volume(w), 0);
+
   const streak = useMemo(() => {
     let s = 0;
     const d = new Date();
+    // if today isn't logged yet, start counting from yesterday
+    if (!activeDays.has(todayKey())) d.setDate(d.getDate() - 1);
     for (;;) {
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       if (activeDays.has(key)) s++;
-      else if (s > 0 || d < new Date(workouts[0]?.date ?? key)) break;
-      else if (s === 0 && key !== workouts[workouts.length - 1]?.date) {
-        // allow today to be unlogged without breaking streak
-      }
+      else break;
       d.setDate(d.getDate() - 1);
-      if (s > 400) break;
+      if (s > 3650) break;
     }
     return s;
-  }, [activeDays, workouts]);
+  }, [activeDays]);
 
   async function download() {
     const json = await exportAll();
@@ -96,66 +93,49 @@ export default function HistoryPage() {
 
       <div className="card">
         <div className="row">
-          <button className="btn" style={{ padding: "8px 12px" }} onClick={() => setCursor((c) => (c.m === 0 ? { y: c.y - 1, m: 11 } : { y: c.y, m: c.m - 1 }))}>
+          <button className="btn" style={{ padding: "8px 14px" }} onClick={() => setCursor((c) => (c.m === 0 ? { y: c.y - 1, m: 11 } : { y: c.y, m: c.m - 1 }))}>
             ‹
           </button>
-          <b className="grow" style={{ textAlign: "center" }}>{monthLabel}</b>
-          <button className="btn" style={{ padding: "8px 12px" }} onClick={() => setCursor((c) => (c.m === 11 ? { y: c.y + 1, m: 0 } : { y: c.y, m: c.m + 1 }))}>
+          <b className="grow" style={{ textAlign: "center", fontSize: 16 }}>{monthLabel}</b>
+          <button className="btn" style={{ padding: "8px 14px" }} onClick={() => setCursor((c) => (c.m === 11 ? { y: c.y + 1, m: 0 } : { y: c.y, m: c.m + 1 }))}>
             ›
           </button>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginTop: 12 }}>
+        <div className="cal-grid">
           {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-            <div key={i} className="hint" style={{ textAlign: "center" }}>{d}</div>
+            <div key={`dow${i}`} className="cal-dow">{d}</div>
           ))}
           {cells.map((key, i) => {
             if (!key) return <div key={`x${i}`} />;
             const dayNum = parseInt(key.slice(-2), 10);
             const active = activeDays.has(key);
-            const count = byDate.get(key)?.length ?? 0;
             return (
-              <div
-                key={key}
-                style={{
-                  aspectRatio: "1",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: active ? 900 : 500,
-                  color: active ? "#06210b" : "var(--text2)",
-                  background: active
-                    ? count > 1
-                      ? "linear-gradient(135deg, var(--neon), var(--neon2))"
-                      : "var(--neon)"
-                    : "var(--card2)",
-                  border: "1px solid var(--line)",
-                }}
-                title={active ? `${count} workout${count > 1 ? "s" : ""}` : undefined}
-              >
+              <div key={key} className={`cal-day ${active ? "on" : ""} ${key === today ? "today" : ""}`} title={active ? "logged workout" : undefined}>
                 {dayNum}
               </div>
             );
           })}
         </div>
-        <p className="hint" style={{ marginBottom: 0 }}>
-          🔥 Streak: <b>{streak}</b> day{streak === 1 ? "" : "s"} — green days are logged workouts.
+        <p className="hint" style={{ marginBottom: 0, marginTop: 12 }}>
+          🔥 Streak: <b>{streak}</b> day{streak === 1 ? "" : "s"} — glowing days are logged workouts.
         </p>
       </div>
 
       <h2>Personal records</h2>
       {prs.length === 0 && <div className="empty">Log weighted sets and your PRs show up here.</div>}
-      {prs.slice(0, 8).map(([name, rec]) => (
-        <div className="card" key={name} style={{ padding: "10px 14px" }}>
-          <b>{name}</b>
-          <span style={{ float: "right", color: "var(--neon)", fontWeight: 900 }}>{rec.weight} lb</span>
-          <span className="hint" style={{ display: "block", marginTop: 2 }}>set {rec.date}</span>
+      {prs.slice(0, 10).map(([name, rec], i) => (
+        <div className="pr-row" key={name}>
+          <span className="medal">{["🥇", "🥈", "🥉"][i] ?? "🏅"}</span>
+          <div>
+            <div className="nm">{name}</div>
+            <div className="when">{rec.date}</div>
+          </div>
+          <span className="wt">{rec.weight} lb</span>
         </div>
       ))}
 
       <h2>All workouts</h2>
-      {workouts.length === 0 && <div className="empty">No workouts yet — your history builds itself as you log.</div>}
+      {workouts.length === 0 && <div className="empty">Nothing yet — your history builds itself as you log.</div>}
       {[...workouts]
         .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt)
         .map((w) => (
@@ -165,7 +145,7 @@ export default function HistoryPage() {
               <span className="hint" style={{ marginLeft: "auto" }}>{w.date}</span>
             </div>
             <span className="hint">
-              {w.sets.length} sets · {volume(w).toLocaleString()} lbs{w.durationMin ? ` · ${w.durationMin} min` : ""}
+              {w.sets.length} sets · {volume(w).toLocaleString()} lbs
             </span>
             {openId === w.id && (
               <div style={{ marginTop: 8 }}>
@@ -189,10 +169,10 @@ export default function HistoryPage() {
       <h2>Data</h2>
       <div className="card">
         <p className="hint" style={{ marginTop: 0 }}>
-          Everything lives on this device. Export a JSON file to back up or move to another phone.
+          Everything lives on this device. Export a JSON file to back up or move phones.
         </p>
         <div className="row">
-          <button className="btn grow" onClick={download}>⬇ Export JSON</button>
+          <button className="btn grow" onClick={download}>⬇ Export</button>
           <label className="btn grow" style={{ textAlign: "center" }}>
             ⬆ Import
             <input type="file" accept="application/json" style={{ display: "none" }} onChange={upload} />

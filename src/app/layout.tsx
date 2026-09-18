@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { TabBar } from "@/components/TabBar";
 
 export const metadata: Metadata = {
   title: "FITMAX — Home Workout Tracker",
@@ -34,11 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <main id="main">{children}</main>
-        <nav className="tabbar">
-          <a href="/">⚡ Today</a>
-          <a href="/equipment">🏋️ Gear</a>
-          <a href="/history">📊 History</a>
-        </nav>
+        <TabBar />
       </body>
     </html>
   );

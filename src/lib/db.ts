@@ -115,14 +115,35 @@ export function volume(w: Workout): number {
 
 // ── Seed data (first launch) ─────────────────────────────────────────────────
 const SEED_EQUIPMENT: Omit<Equipment, "id" | "createdAt">[] = [
-  { name: "Dumbbells (pair)", emoji: "🏋️", category: "weights", weightLb: 50, note: "Adjustable? note the max here" },
-  { name: "Kettlebell", emoji: "🔔", category: "weights", weightLb: 35, note: "" },
-  { name: "Pull-up bar", emoji: "🧗", category: "bodyweight", weightLb: null, note: "" },
-  { name: "Bench", emoji: "🛏️", category: "weights", weightLb: null, note: "" },
-  { name: "Resistance bands", emoji: "🎗️", category: "misc", weightLb: null, note: "" },
-  { name: "Yoga mat", emoji: "🧘", category: "misc", weightLb: null, note: "" },
-  { name: "Jump rope", emoji: "🪢", category: "cardio", weightLb: null, note: "" },
+  { name: "Dumbbells (2× 10 lb)", emoji: "🏋️", category: "weights", weightLb: 10, note: "a pair" },
+  { name: "Kettlebell (15 lb)", emoji: "🔔", category: "weights", weightLb: 15, note: "" },
+  { name: "Chair", emoji: "🪑", category: "bodyweight", weightLb: null, note: "for squats + dips" },
 ];
+
+// ── Go-to move catalog ──────────────────────────────────────────────────────
+// Standing or seated, no laying down, no bending over. `match` finds the
+// equipment by name substring; weight is the sensible default.
+export type MoveDef = { name: string; emoji: string; match: string | null; weight: number | null };
+export const MOVES: MoveDef[] = [
+  { name: "Bicep Curls", emoji: "💪", match: "Dumbbells", weight: 10 },
+  { name: "Hammer Curls", emoji: "🔨", match: "Dumbbells", weight: 10 },
+  { name: "Lateral Raise", emoji: "↔️", match: "Dumbbells", weight: 10 },
+  { name: "Front Raise", emoji: "⬆️", match: "Dumbbells", weight: 10 },
+  { name: "Overhead Press", emoji: "🙌", match: "Dumbbells", weight: 10 },
+  { name: "Upright Row", emoji: "🚣", match: "Dumbbells", weight: 10 },
+  { name: "Goblet Squat", emoji: "🦵", match: "Kettlebell", weight: 15 },
+  { name: "KB Halo", emoji: "🌀", match: "Kettlebell", weight: 15 },
+  { name: "Seated KB Press", emoji: "🪑", match: "Kettlebell", weight: 15 },
+  { name: "Chair Squats", emoji: "🪑", match: "Chair", weight: null },
+  { name: "Chair Dips", emoji: "🪑", match: "Chair", weight: null },
+  { name: "Calf Raises", emoji: "🦶", match: null, weight: null },
+];
+
+/** Find the equipment row a move attaches to. */
+export function equipmentForMove(equipment: Equipment[], move: MoveDef): Equipment | null {
+  if (!move.match) return null;
+  return equipment.find((e) => e.name.toLowerCase().includes(move.match!.toLowerCase())) ?? null;
+}
 
 export async function seedIfEmpty(): Promise<void> {
   const eq = await equipmentStore.all();
